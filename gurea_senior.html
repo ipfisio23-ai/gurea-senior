@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Gurea Clínico | Geriatría</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        gurea: { base: '#4EAFD8', dark: '#2b7a9a', light: '#e0f2fe' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #f8fafc; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .dt-active { background-color: #fef08a !important; color: #854d0e !important; border-color: #eab308 !important; }
+        .heat-box { width: 12px; height: 12px; border-radius: 2px; }
+        .heat-none { background-color: #f1f5f9; }
+        .heat-val { background-color: #a855f7; }
+        .heat-ses { background-color: #4EAFD8; }
+        .heat-both { background-color: #ec4899; }
+    </style>
+</head>
+<body class="pb-24">
+
+    <!-- Header -->
+    <header class="bg-white p-4 border-b border-slate-200 sticky top-0 z-40 flex justify-between items-center shadow-sm">
+        <h1 class="text-xl font-bold text-gurea-base flex items-center gap-2">
+            <img src="Logotipo-Gurea-300.png" alt="Gurea" class="h-6 object-contain" onerror="this.outerHTML='<i class=\'fa-solid fa-notes-medical\'></i>'">
+            <span class="text-slate-500 font-normal">Senior</span>
+        </h1>
+        <div id="current-patient-badge" class="hidden bg-gurea-light text-gurea-dark px-3 py-1 rounded-full text-sm font-bold border border-gurea-base/30"></div>
+    </header>
+
+    <main class="p-4 max-w-3xl mx-auto">
+        
+        <!-- TAB 1: PACIENTES -->
+        <div id="tab-patients" class="tab-content active">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 mb-6 space-y-4">
+                <div class="flex gap-2">
+                    <input type="text" id="new-patient-name" placeholder="Nombre del paciente..." class="w-full bg-slate-50 p-3 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-gurea-base border border-slate-200">
+                    <button onclick="addPatient()" class="bg-gurea-base text-white px-5 rounded-xl font-bold hover:bg-gurea-dark transition-colors"><i class="fa-solid fa-plus"></i></button>
+                </div>
+                <button onclick="generarPacientePrueba()" class="w-full bg-slate-50 border border-dashed border-gurea-base text-gurea-dark p-3 rounded-xl font-bold text-sm hover:bg-gurea-light transition-colors">
+                    <i class="fa-solid fa-user-check mr-2"></i> Generar Paciente Ejemplo (VGI)
+                </button>
+            </div>
+            
+            <h2 class="text-sm font-bold text-slate-500 mb-3 uppercase tracking-wider ml-1">Listado Clínico</h2>
+            <div id="patients-list" class="grid gap-3 mb-8"></div>
+        </div>
+
+        <!-- TAB 2: CONSOLA -->
+        <div id="tab-console" class="tab-content">
+            <div id="no-patient-warning" class="text-center text-slate-400 mt-20">
+                <i class="fa-solid fa-clipboard-user text-5xl mb-4 text-slate-300"></i>
+                <p class="text-lg">Selecciona un paciente</p>
+            </div>
+
+            <!-- Dashboard VGI (Pre-Sesión) -->
+            <div id="console-setup" class="hidden">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 mb-6 overflow-hidden">
+                    <div class="bg-slate-50 p-4 border-b border-slate-200 flex justify-between items-center">
+                        <h2 class="font-bold text-slate-800"><i class="fa-solid fa-file-medical text-gurea-base mr-2"></i>Estado Funcional (VGI)</h2>
+                        <button onclick="openValuationModal()" class="text-xs bg-white border border-slate-300 text-slate-600 px-3 py-1.5 rounded-lg hover:bg-slate-50 font-bold shadow-sm">
+                            <i class="fa-solid fa-pen-to-square mr-1"></i> Actualizar
+                        </button>
+                    </div>
+                    <div class="p-5" id="vgi-status-content"></div>
+                </div>
+
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="h-px bg-slate-200 flex-1"></div>
+                    <h3 class="text-xs font-bold text-slate-400 uppercase">Prescripción</h3>
+                    <div class="h-px bg-slate-200 flex-1"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <button onclick="generarRutinaInteligente()" class="col-span-2 bg-gurea-base text-white p-4 rounded-xl font-bold text-base shadow-lg shadow-gurea-base/20 active:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Autogenerar Rutina (Libro Blanco)
+                    </button>
+                    <button onclick="startNewSession()" class="bg-white border border-slate-300 text-slate-700 p-3 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98]">
+                        Sesión en Blanco
+                    </button>
+                    <button onclick="openTemplatesModal()" class="bg-white border border-slate-300 text-slate-700 p-3 rounded-xl font-bold text-sm shadow-sm active:scale-[0.98]">
+                        <i class="fa-solid fa-gear"></i> Editor Plantillas
+                    </button>
+                </div>
+
+                <div id="setup-recent-sessions-list" class="flex flex-col gap-2"></div>
+            </div>
+
+            <!-- Consola Activa (Entrenamiento) -->
+            <div id="console-active" class="hidden">
+                <div class="flex justify-between items-center mb-4 px-1">
+                    <h2 class="font-bold text-slate-800 text-lg">Sesión Activa</h2>
+                    <span id="active-vgi-indicator" class="text-[10px] font-bold bg-white px-3 py-1 rounded-full border border-slate-200 shadow-sm text-slate-600"></span>
+                </div>
+
+                <div id="active-exercises-list" class="flex flex-col gap-4 mb-6"></div>
+                
+                <button onclick="openExerciseModal()" class="w-full bg-white border-2 border-dashed border-slate-300 text-slate-500 p-4 rounded-xl font-bold mb-8 hover:bg-slate-50 transition-colors active:scale-[0.98]">
+                    <i class="fa-solid fa-plus mr-2"></i> Añadir Ejercicio
+                </button>
+
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 mb-8 shadow-sm">
+                    <label class="block text-sm font-bold text-slate-700 mb-2"><i class="fa-solid fa-book-medical text-gurea-base mr-1"></i> Evolución y Notas</label>
+                    <textarea id="session-notes" rows="3" class="w-full bg-slate-50 p-3 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-gurea-base border border-slate-200 resize-none text-sm" placeholder="Respuesta al esfuerzo, adherencia, modificaciones..."></textarea>
+                </div>
+
+                <button onclick="finishSession()" class="w-full bg-emerald-500 text-white p-4 rounded-xl font-bold text-lg mb-8 shadow-lg shadow-emerald-500/30 active:scale-[0.98] transition-transform">
+                    Guardar Sesión
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 3: GRÁFICOS -->
+        <div id="tab-charts" class="tab-content">
+            <div id="charts-no-patient" class="text-center text-slate-400 mt-20">
+                <i class="fa-solid fa-chart-line text-5xl mb-4 text-slate-300"></i>
+                <p class="text-lg">Selecciona un paciente</p>
+            </div>
+
+            <div id="charts-container" class="hidden flex flex-col gap-6">
+                <select id="history-patient-select" onchange="selectPatientFromHistory()" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-gurea-base font-bold shadow-sm">
+                </select>
+
+                <div id="charts-empty-state" class="text-center py-10 text-slate-500 hidden bg-white rounded-xl border border-slate-200 shadow-sm">
+                    Aún no hay datos clínicos registrados.
+                </div>
+
+                <div id="charts-data-content" class="space-y-6">
+                    
+                    <button onclick="openPdfConfigModal()" class="w-full bg-slate-800 text-white p-3 rounded-xl font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
+                        <i class="fa-solid fa-file-pdf text-red-400"></i> Exportar Informe Clínico (PDF)
+                    </button>
+
+                    <!-- Mini Calendario de 90 días con KPI Adherencia -->
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Actividad (90 días)</h3>
+                            <div class="bg-slate-50 border border-slate-200 px-3 py-1 rounded-lg text-center">
+                                <span class="block text-[9px] text-slate-400 font-bold uppercase">Media Sesiones</span>
+                                <span id="adherence-kpi" class="text-sm font-bold text-gurea-dark">0 / sem</span>
+                            </div>
+                        </div>
+                        <div id="heatmap-container" class="flex flex-wrap gap-1 mb-3"></div>
+                        <div class="flex gap-3 text-[10px] font-bold text-slate-400 justify-end mt-2 pt-2 border-t border-slate-100">
+                            <span class="flex items-center gap-1"><div class="heat-box heat-val"></div> VGI</span>
+                            <span class="flex items-center gap-1"><div class="heat-box heat-ses"></div> Sesión</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-1">
+                            <h3 class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">SPPB (0-12)</h3>
+                            <div class="relative h-32 w-full"><canvas id="sppbChart"></canvas></div>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-1">
+                            <h3 class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Mini-BEST (0-28)</h3>
+                            <div class="relative h-32 w-full"><canvas id="minibestChart"></canvas></div>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-1">
+                            <h3 class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">SARC-F (0-10)</h3>
+                            <div class="relative h-32 w-full"><canvas id="sarcfChart"></canvas></div>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-1">
+                            <h3 class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">MNA (0-14)</h3>
+                            <div class="relative h-32 w-full"><canvas id="mnaChart"></canvas></div>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-1">
+                            <h3 class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">TUG (seg)</h3>
+                            <div class="relative h-32 w-full"><canvas id="tugChart"></canvas></div>
+                        </div>
+                        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-1">
+                            <h3 class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Fuerza (Kg)</h3>
+                            <div class="relative h-32 w-full"><canvas id="gripChart"></canvas></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 class="text-xs font-bold text-slate-500 mb-4 text-center uppercase tracking-wider">Distribución por Dominios (Volumen)</h3>
+                        <div class="relative h-56 w-full flex justify-center"><canvas id="radarChart"></canvas></div>
+                    </div>
+
+                    <div class="mt-8">
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Diario Clínico (Notas VGI)</h3>
+                        <div id="history-notes-list" class="flex flex-col gap-3 mb-6"></div>
+                        
+                        <h3 class="text-sm font-bold text-slate-800 mb-3 uppercase tracking-wider">Registro de Sesiones</h3>
+                        <div id="history-accordion" class="flex flex-col gap-2 mb-10"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <nav class="fixed bottom-0 w-full bg-white border-t border-slate-200 pb-safe z-40 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div class="flex justify-around p-2 max-w-md mx-auto">
+            <button onclick="switchTab('patients')" id="nav-patients" class="nav-btn text-gurea-base flex flex-col items-center gap-1 w-20 py-1 transition-colors">
+                <i class="fa-solid fa-users text-xl"></i>
+                <span class="text-[10px] font-bold">Pacientes</span>
+            </button>
+            <button onclick="switchTab('console')" id="nav-console" class="nav-btn text-slate-400 flex flex-col items-center gap-1 w-20 py-1 transition-colors">
+                <i class="fa-solid fa-stethoscope text-xl"></i>
+                <span class="text-[10px] font-bold">Intervención</span>
+            </button>
+            <button onclick="switchTab('charts')" id="nav-charts" class="nav-btn text-slate-400 flex flex-col items-center gap-1 w-20 py-1 transition-colors">
+                <i class="fa-solid fa-chart-pie text-xl"></i>
+                <span class="text-[10px] font-bold">Evolución</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Modal VGI con scroll asegurado -->
+    <div id="vgi-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] flex flex-col justify-end">
+        <div class="bg-white rounded-t-3xl flex-1 flex flex-col mt-8 shadow-2xl overflow-hidden max-h-[90vh]">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-3xl shadow-sm z-10">
+                <h2 class="text-lg font-bold text-slate-800">Valoración Geriátrica (VGI)</h2>
+                <button onclick="closeValuationModal()" class="w-8 h-8 bg-white border border-slate-200 rounded-full text-slate-500 hover:bg-slate-100 transition-colors"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div id="vgi-modal-scroll" class="flex-1 overflow-y-auto p-5 space-y-6 bg-white">
+                <!-- SPPB con descripciones -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <h3 class="font-bold text-slate-800 text-sm mb-3 border-b border-slate-200 pb-2">SPPB (0-12)</h3>
+                    <div class="space-y-3 mb-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Equilibrio</label>
+                            <select id="vgi-sppb-eq" onchange="calcSppb()" class="w-full p-2 border border-slate-300 rounded bg-white font-bold text-xs">
+                                <option value="0">0 - Incapaz</option>
+                                <option value="1">1 - Pies juntos 10s</option>
+                                <option value="2">2 - Semitándem 10s</option>
+                                <option value="3">3 - Tándem 3-9s</option>
+                                <option value="4">4 - Tándem ≥10s</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Marcha (4m)</label>
+                            <select id="vgi-sppb-ma" onchange="calcSppb()" class="w-full p-2 border border-slate-300 rounded bg-white font-bold text-xs">
+                                <option value="0">0 - Incapaz</option>
+                                <option value="1">1 - > 8.70s</option>
+                                <option value="2">2 - 6.21 a 8.70s</option>
+                                <option value="3">3 - 4.82 a 6.20s</option>
+                                <option value="4">4 - < 4.82s</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-500 uppercase block mb-1">Silla (5 reps)</label>
+                            <select id="vgi-sppb-si" onchange="calcSppb()" class="w-full p-2 border border-slate-300 rounded bg-white font-bold text-xs">
+                                <option value="0">0 - Incapaz / >60s</option>
+                                <option value="1">1 - 16.7 a 60s</option>
+                                <option value="2">2 - 13.7 a 16.6s</option>
+                                <option value="3">3 - 11.2 a 13.6s</option>
+                                <option value="4">4 - < 11.1s</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200">
+                        <span class="text-xs font-bold text-slate-600">TOTAL SPPB:</span>
+                        <span id="vgi-sppb-total" class="text-lg font-bold text-gurea-dark">0</span>
+                    </div>
+                </div>
+
+                <!-- Mini-BESTest -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 transition-all">
+                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleVgiSection('minibest-container')">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">Mini-BESTest (0-28)</h3>
+                            <p class="text-[10px] text-slate-500">Toca para abrir/cerrar calculadora</p>
+                        </div>
+                        <span id="vgi-minibest-total" class="text-lg font-bold text-slate-400">0</span>
+                    </div>
+                    <div id="minibest-container" class="hidden mt-4 pt-3 border-t border-slate-200">
+                        <div class="flex flex-col gap-3" id="minibest-grid">
+                            <!-- Inyectado por JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TUG & Dinamometría -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label class="font-bold text-slate-800 text-sm mb-2 block">TUG (seg)</label>
+                        <input type="number" id="vgi-tug" step="0.1" placeholder="Ej: 14.5" class="w-full p-2 border border-slate-300 rounded bg-white text-center font-bold text-lg">
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label class="font-bold text-slate-800 text-sm mb-2 block">Fuerza (Kg)</label>
+                        <input type="number" id="vgi-grip" step="0.5" placeholder="Ej: 18" class="w-full p-2 border border-slate-300 rounded bg-white text-center font-bold text-lg">
+                    </div>
+                </div>
+
+                <!-- SARC-F Calculadora -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 transition-all">
+                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleVgiSection('sarcf-container')">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">SARC-F (0-10)</h3>
+                            <p class="text-[10px] text-slate-500">Toca para abrir/cerrar</p>
+                        </div>
+                        <span id="vgi-sarcf-total" class="text-lg font-bold text-slate-400">0</span>
+                    </div>
+                    <div id="sarcf-container" class="hidden space-y-3 mt-4 pt-3 border-t border-slate-200">
+                        <div><label class="text-xs font-bold text-slate-600">Fuerza (cargar 4.5kg)</label>
+                            <select id="sarcf-1" onchange="calcSarcf()" class="w-full p-2 border rounded bg-white text-sm"><option value="0">Ninguna (0)</option><option value="1">Alguna (1)</option><option value="2">Incapaz (2)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">Asistencia al caminar</label>
+                            <select id="sarcf-2" onchange="calcSarcf()" class="w-full p-2 border rounded bg-white text-sm"><option value="0">Ninguna (0)</option><option value="1">Alguna (1)</option><option value="2">Incapaz (2)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">Levantarse silla/cama</label>
+                            <select id="sarcf-3" onchange="calcSarcf()" class="w-full p-2 border rounded bg-white text-sm"><option value="0">Ninguna (0)</option><option value="1">Alguna (1)</option><option value="2">Incapaz (2)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">Subir 10 escalones</label>
+                            <select id="sarcf-4" onchange="calcSarcf()" class="w-full p-2 border rounded bg-white text-sm"><option value="0">Ninguna (0)</option><option value="1">Alguna (1)</option><option value="2">Incapaz (2)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">Caídas (último año)</label>
+                            <select id="sarcf-5" onchange="calcSarcf()" class="w-full p-2 border rounded bg-white text-sm"><option value="0">Ninguna (0)</option><option value="1">1 a 3 (1)</option><option value="2">4 o más (2)</option></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MNA-SF Calculadora -->
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 transition-all">
+                    <div class="flex justify-between items-center cursor-pointer" onclick="toggleVgiSection('mna-container')">
+                        <div>
+                            <h3 class="font-bold text-slate-800 text-sm">MNA-SF (0-14)</h3>
+                            <p class="text-[10px] text-slate-500">Toca para abrir/cerrar</p>
+                        </div>
+                        <span id="vgi-nutri-label" class="text-sm font-bold text-slate-400">Normal</span>
+                    </div>
+                    <div id="mna-container" class="hidden space-y-3 mt-4 pt-3 border-t border-slate-200">
+                        <div><label class="text-xs font-bold text-slate-600">A. Disminución ingesta (3 meses)</label>
+                            <select id="mna-1" onchange="calcMna()" class="w-full p-2 border rounded bg-white text-sm"><option value="2">No ha disminuido (2)</option><option value="1">Moderada (1)</option><option value="0">Severa (0)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">B. Pérdida de peso (3 meses)</label>
+                            <select id="mna-2" onchange="calcMna()" class="w-full p-2 border rounded bg-white text-sm"><option value="3">No ha perdido (3)</option><option value="2">1-3 kg (2)</option><option value="1">No sabe (1)</option><option value="0">>3 kg (0)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">C. Movilidad</label>
+                            <select id="mna-3" onchange="calcMna()" class="w-full p-2 border rounded bg-white text-sm"><option value="2">Sale domicilio (2)</option><option value="1">Interior (1)</option><option value="0">Cama/silla (0)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">D. Enf. aguda / Estrés (3 meses)</label>
+                            <select id="mna-4" onchange="calcMna()" class="w-full p-2 border rounded bg-white text-sm"><option value="2">No (2)</option><option value="0">Sí (0)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">E. Problemas neuropsicológicos</label>
+                            <select id="mna-5" onchange="calcMna()" class="w-full p-2 border rounded bg-white text-sm"><option value="2">Sin problemas (2)</option><option value="1">Demencia leve (1)</option><option value="0">Demencia/Depre severa (0)</option></select>
+                        </div>
+                        <div><label class="text-xs font-bold text-slate-600">F. IMC</label>
+                            <select id="mna-6" onchange="calcMna()" class="w-full p-2 border rounded bg-white text-sm"><option value="3">IMC >= 23 (3)</option><option value="2">21 - 22.9 (2)</option><option value="1">19 - 20.9 (1)</option><option value="0">IMC < 19 (0)</option></select>
+                        </div>
+                        <div class="flex justify-between items-center bg-white p-2 rounded border border-slate-200 mt-2">
+                            <span class="text-xs font-bold text-slate-600">TOTAL MNA-SF:</span>
+                            <span id="vgi-mna-total" class="text-sm font-bold text-slate-800">14</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <textarea id="vgi-notas" rows="2" class="w-full p-3 border border-slate-300 rounded-xl bg-white text-sm" placeholder="Observaciones clínicas, medicación, estado cognitivo..."></textarea>
+            </div>
+            
+            <div class="p-4 bg-white border-t border-slate-200 flex gap-3 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                <button onclick="closeValuationModal()" class="w-1/3 bg-slate-100 text-slate-600 p-4 rounded-xl font-bold shadow-sm hover:bg-slate-200 transition-colors">
+                    Cancelar
+                </button>
+                <button onclick="saveValuation()" class="w-2/3 bg-gurea-base text-white p-4 rounded-xl font-bold shadow-md hover:bg-gurea-dark transition-colors">
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal PDF Config -->
+    <div id="pdf-config-modal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div class="p-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h2 class="font-bold text-slate-800"><i class="fa-solid fa-file-pdf text-red-500 mr-2"></i>Configurar Informe</h2>
+                <button onclick="document.getElementById('pdf-config-modal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-5 space-y-4">
+                <div>
+                    <label class="flex items-center gap-2 font-bold text-slate-700 text-sm mb-2">
+                        <input type="checkbox" id="pdf-inc-vgi" checked class="w-4 h-4 text-gurea-base rounded" onchange="document.getElementById('pdf-vgi-options').classList.toggle('opacity-50')"> 
+                        Incluir Valoraciones (VGI)
+                    </label>
+                    <div id="pdf-vgi-options" class="ml-6 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                        <label class="flex items-center gap-1"><input type="checkbox" id="pdf-v-sppb" checked> SPPB</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" id="pdf-v-mb" checked> Mini-BEST</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" id="pdf-v-sarcf" checked> SARC-F</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" id="pdf-v-mna" checked> MNA</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" id="pdf-v-tug" checked> TUG</label>
+                        <label class="flex items-center gap-1"><input type="checkbox" id="pdf-v-grip" checked> Fuerza</label>
+                    </div>
+                </div>
+                <div class="border-t border-slate-200 pt-4">
+                    <label class="flex items-center gap-2 font-bold text-slate-700 text-sm">
+                        <input type="checkbox" id="pdf-inc-ses" checked class="w-4 h-4 text-gurea-base rounded"> 
+                        Incluir Sesiones (Volumen)
+                    </label>
+                    <p class="text-[10px] text-slate-400 ml-6 mt-1">Se exportará el volumen de trabajo. Las notas clínicas de entrenamiento no se incluyen en informes formales.</p>
+                </div>
+            </div>
+            <div class="p-4 bg-slate-50 border-t border-slate-200">
+                <button onclick="executePDF()" class="w-full bg-gurea-base text-white py-3 rounded-xl font-bold shadow-md hover:bg-gurea-dark transition-colors">
+                    Generar Documento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Ejercicios -->
+    <div id="exercise-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex flex-col justify-end">
+        <div class="bg-white rounded-t-3xl flex-1 flex flex-col mt-12 shadow-2xl">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-3xl">
+                <h2 class="text-lg font-bold text-slate-800">Catálogo Terapéutico</h2>
+                <button onclick="closeExerciseModal()" class="w-8 h-8 bg-white border border-slate-200 rounded-full text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex overflow-x-auto hide-scrollbar p-2 bg-slate-50 border-b border-slate-200 gap-1" id="pattern-tabs"></div>
+            <div class="flex-1 overflow-y-auto p-3 bg-white space-y-2" id="modal-exercise-list"></div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Plantillas -->
+    <div id="templates-modal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex flex-col justify-end">
+        <div class="bg-white rounded-t-3xl flex-1 flex flex-col mt-12 shadow-2xl">
+            <div class="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 rounded-t-3xl">
+                <h2 class="text-lg font-bold text-slate-800">Configurar Plantillas</h2>
+                <button onclick="closeTemplatesModal()" class="w-8 h-8 bg-white border border-slate-200 rounded-full text-slate-500"><i class="fa-solid fa-check"></i></button>
+            </div>
+            <div class="p-3 bg-white border-b border-slate-200 flex gap-2 overflow-x-auto hide-scrollbar" id="template-level-tabs">
+                <button onclick="editTemplate('A')" class="px-4 py-2 rounded-lg font-bold text-sm bg-red-100 text-red-700 border border-red-200">Discapacidad (A)</button>
+                <button onclick="editTemplate('B')" class="px-4 py-2 rounded-lg font-bold text-sm bg-orange-100 text-orange-700 border border-orange-200">Frágil (B)</button>
+                <button onclick="editTemplate('C')" class="px-4 py-2 rounded-lg font-bold text-sm bg-yellow-100 text-yellow-700 border border-yellow-300">Pre-Frágil (C)</button>
+                <button onclick="editTemplate('D')" class="px-4 py-2 rounded-lg font-bold text-sm bg-green-100 text-green-700 border border-green-200">Robusto (D)</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 bg-slate-50" id="template-editor-content"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // Init MiniBESTest UI with Explanations
+        const miniBestData = [
+            { name: "1. Sentado a pie", options: ["0 - Incapaz / Ayuda / Múltiples intentos", "1 - Usa manos", "2 - Normal (Sin manos)"] },
+            { name: "2. Puntillas", options: ["0 - < 3s", "1 - Altura inferior / Inestable", "2 - Normal (3s altura max)"] },
+            { name: "3. Apoyo monopodal", options: ["0 - Incapaz", "1 - < 20s", "2 - Normal (20s)"] },
+            { name: "4. Paso adelante", options: ["0 - Cae / Sin paso", "1 - >1 paso", "2 - Normal (1 paso)"] },
+            { name: "5. Paso atrás", options: ["0 - Cae / Sin paso", "1 - >1 paso", "2 - Normal (1 paso)"] },
+            { name: "6. Paso lateral", options: ["0 - Cae / Sin paso", "1 - >1 paso", "2 - Normal (1 paso)"] },
+            { name: "7. Pie juntos, OA", options: ["0 - Incapaz", "1 - < 30s", "2 - Normal (30s)"] },
+            { name: "8. Espuma, OC", options: ["0 - Incapaz", "1 - < 30s", "2 - Normal (30s)"] },
+            { name: "9. Inclinado OC", options: ["0 - Incapaz", "1 - < 30s / Alinea superficie", "2 - Normal (30s alineado grav.)"] },
+            { name: "10. Cambio vel.", options: ["0 - Incapaz + Desequilibrio", "1 - Incapaz o Desequilibrio", "2 - Normal (Cambios sin deseq.)"] },
+            { name: "11. Giros cabeza", options: ["0 - Desequilibrio", "1 - Disminuye velocidad", "2 - Normal (Sin cambio vel.)"] },
+            { name: "12. Giro pivote", options: ["0 - Desequilibrio", "1 - Lento (>4 pasos)", "2 - Normal (<3 pasos)"] },
+            { name: "13. Obstáculos", options: ["0 - Incapaz / Rodea", "1 - Toca o Enlentece", "2 - Normal"] },
+            { name: "14. TUG DT", options: ["0 - Para de contar/andar", "1 - Afecta >10%", "2 - Normal (Sin cambios)"] }
+        ];
+        
+        const mbGrid = document.getElementById('minibest-grid');
+        miniBestData.forEach((item, i) => {
+            let opts = `<option value="0">${item.options[0]}</option><option value="1">${item.options[1]}</option><option value="2">${item.options[2]}</option>`;
+            mbGrid.innerHTML += `
+                <div class="bg-white border border-slate-200 rounded p-3 shadow-sm">
+                    <label class="text-xs font-bold text-slate-700 block mb-2">${item.name}</label>
+                    <select id="mb-${i}" onchange="calcMiniBest()" class="w-full text-[11px] font-bold bg-slate-50 border border-slate-300 rounded p-2 focus:ring-1 focus:ring-gurea-base focus:outline-none">
+                        ${opts}
+                    </select>
+                </div>
+            `;
+        });
+
+        const DOMINIOS = ["Fuerza", "Equilibrio/Marcha", "Aeróbico", "Flexibilidad"];
+        let EXERCISE_DB = [
+            { name: "Levantarse de Silla", domain: "Fuerza" },
+            { name: "Prensa de piernas (Gomas)", domain: "Fuerza" },
+            { name: "Flexión Plantar (Puntillas)", domain: "Fuerza" },
+            { name: "Extensión de rodilla", domain: "Fuerza" },
+            { name: "Remo con gomas", domain: "Fuerza" },
+            { name: "Tándem / Semitándem", domain: "Equilibrio/Marcha" },
+            { name: "Marcha con obstáculos", domain: "Equilibrio/Marcha" },
+            { name: "Apoyo Unipodal", domain: "Equilibrio/Marcha" },
+            { name: "Pasos laterales", domain: "Equilibrio/Marcha" },
+            { name: "Marcha continua (Paseo)", domain: "Aeróbico" },
+            { name: "Pedalear (Estática)", domain: "Aeróbico" },
+            { name: "Subir/Bajar escalón", domain: "Aeróbico" },
+            { name: "Estiramiento Isquios", domain: "Flexibilidad" },
+            { name: "Estiramiento Gemelos", domain: "Flexibilidad" }
+        ];
+
+        let CUSTOM_TEMPLATES = JSON.parse(localStorage.getItem('gurea_senior_templates')) || {
+            'A': [ { name: "Levantarse de Silla", domain: "Fuerza", s:1, r:8, res:'kg', w:0 }, { name: "Extensión de rodilla", domain: "Fuerza", s:1, r:8, res:'🟡', w:1 }, { name: "Marcha continua (Paseo)", domain: "Aeróbico", s:1, r:5, res:'kg', w:0, dur:'sec' } ],
+            'B': [ { name: "Levantarse de Silla", domain: "Fuerza", s:2, r:10, res:'kg', w:0 }, { name: "Flexión Plantar (Puntillas)", domain: "Fuerza", s:2, r:10, res:'kg', w:0 }, { name: "Tándem / Semitándem", domain: "Equilibrio/Marcha", s:2, r:15, res:'kg', w:0, dur:'sec' }, { name: "Marcha continua (Paseo)", domain: "Aeróbico", s:1, r:10, res:'kg', w:0, dur:'sec' } ],
+            'C': [ { name: "Levantarse de Silla", domain: "Fuerza", s:2, r:12, res:'kg', w:0 }, { name: "Prensa de piernas (Gomas)", domain: "Fuerza", s:2, r:12, res:'🔴', w:1 }, { name: "Apoyo Unipodal", domain: "Equilibrio/Marcha", s:2, r:20, res:'kg', w:0, dur:'sec' }, { name: "Subir/Bajar escalón", domain: "Aeróbico", s:2, r:12, res:'kg', w:0 } ],
+            'D': [ { name: "Levantarse de Silla", domain: "Fuerza", s:3, r:15, res:'kg', w:5 }, { name: "Marcha con obstáculos", domain: "Equilibrio/Marcha", s:3, r:10, res:'kg', w:0 }, { name: "Pedalear (Estática)", domain: "Aeróbico", s:1, r:20, res:'kg', w:0, dur:'sec' }, { name: "Estiramiento Isquios", domain: "Flexibilidad", s:2, r:30, res:'kg', w:0, dur:'sec' } ]
+        };
+
+        function saveTemplates() { localStorage.setItem('gurea_senior_templates', JSON.stringify(CUSTOM_TEMPLATES)); }
+
+        let patients = JSON.parse(localStorage.getItem('gurea_senior_data')) || [];
+        let currentPatient = null;
+        let currentWorkout = [];
+        let activeDomainTab = "Fuerza";
+        let activeTemplateEdit = 'C';
+        let charts = { sppb: null, tug: null, grip: null, radar: null, minibest: null, sarcf: null, mna: null };
+        let logoBase64 = null;
+        let weeklyAvgValue = 0; // Para el PDF
+
+        // Cargar Logo para PDF
+        window.onload = function() {
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.onload = function() {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext("2d").drawImage(img, 0, 0);
+                logoBase64 = canvas.toDataURL("image/png");
+            };
+            img.src = 'Logotipo-Gurea-300.png';
+        };
+
+        function savePatients() {
+            localStorage.setItem('gurea_senior_data', JSON.stringify(patients));
+            renderPatientsList();
+        }
+
+        function addPatient() {
+            const input = document.getElementById('new-patient-name');
+            if(!input.value.trim()) return;
+            const newPat = { id: Date.now().toString(), name: input.value.trim(), valuations: [], sessions: [] };
+            patients.push(newPat);
+            savePatients();
+            input.value = '';
+            selectPatient(newPat.id);
+        }
+
+        function selectPatient(id) {
+            currentPatient = patients.find(p => p.id === id);
+            document.getElementById('current-patient-badge').textContent = currentPatient.name;
+            document.getElementById('current-patient-badge').classList.remove('hidden');
+            renderPatientsList();
+            switchTab('console');
+        }
+
+        function renderPatientsList() {
+            const list = document.getElementById('patients-list');
+            list.innerHTML = '';
+            patients.forEach(p => {
+                const isSelected = currentPatient && currentPatient.id === p.id;
+                let valText = "Sin VGI";
+                if(p.valuations.length > 0) {
+                    const last = p.valuations[p.valuations.length-1];
+                    valText = `SPPB: ${last.sppbTotal} | TUG: ${last.tug || '-'}s`;
+                }
+                list.innerHTML += `
+                    <div onclick="selectPatient('${p.id}')" class="p-4 rounded-xl flex justify-between items-center cursor-pointer shadow-sm transition-all ${isSelected ? 'bg-gurea-light border-2 border-gurea-base' : 'bg-white border border-slate-200 hover:border-gurea-base/50'}">
+                        <div>
+                            <p class="font-bold text-slate-800">${p.name}</p>
+                            <p class="text-[11px] text-slate-500">${valText}</p>
+                        </div>
+                        <span class="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-600 font-mono border border-slate-200">${p.sessions.length} ses</span>
+                    </div>
+                `;
+            });
+        }
+
+        function generarPacientePrueba() {
+            const prueba = {
+                id: "test_" + Date.now(),
+                name: "Carmen (Fragilidad Intermedia)",
+                valuations: [
+                    { id: Date.now()-3000000, date: new Date(Date.now()-60*86400000).toISOString(), sppbEq: 2, sppbMa: 2, sppbSi: 1, sppbTotal: 5, minibest: 14, tug: 16.5, grip: 10, nutri: "Riesgo Malnutrición", mna: 9, sarcf: 6, notes: "Inicio programa." },
+                    { id: Date.now()-1000000, date: new Date(Date.now()-30*86400000).toISOString(), sppbEq: 3, sppbMa: 2, sppbSi: 2, sppbTotal: 7, minibest: 18, tug: 14.2, grip: 12, nutri: "Normal", mna: 12, sarcf: 4, notes: "Mejora en transferencias. Menor riesgo de caídas general." }
+                ],
+                sessions: [
+                    {
+                        id: (Date.now() - 86400000 * 2).toString(),
+                        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+                        notes: "Fatiga rápida en marcha. Buena técnica en sentadilla.",
+                        exercises: [
+                            { name: "Levantarse de Silla", domain: "Fuerza", sets: [{weight: 0, reps: 10, rpe: 6, dt: false, resType: 'kg', durType: 'reps'}] },
+                            { name: "Tándem / Semitándem", domain: "Equilibrio/Marcha", sets: [{weight: 0, reps: 20, rpe: 5, dt: true, resType: 'kg', durType: 'sec'}] }
+                        ]
+                    }
+                ]
+            };
+            patients.push(prueba);
+            savePatients();
+            selectPatient(prueba.id);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('text-gurea-base');
+                btn.classList.add('text-slate-400');
+            });
+            document.getElementById(`nav-${tabId}`).classList.remove('text-slate-400');
+            document.getElementById(`nav-${tabId}`).classList.add('text-gurea-base');
+
+            if(tabId === 'console') updateConsoleView();
+            if(tabId === 'charts') prepChartsTab();
+        }
+
+        function updateConsoleView() {
+            if(!currentPatient) {
+                document.getElementById('no-patient-warning').classList.remove('hidden');
+                document.getElementById('console-setup').classList.add('hidden');
+                document.getElementById('console-active').classList.add('hidden');
+                return;
+            }
+            document.getElementById('no-patient-warning').classList.add('hidden');
+            
+            if(currentWorkout.length > 0) {
+                document.getElementById('console-setup').classList.add('hidden');
+                document.getElementById('console-active').classList.remove('hidden');
+            } else {
+                document.getElementById('console-setup').classList.remove('hidden');
+                document.getElementById('console-active').classList.add('hidden');
+                renderVgiStatus();
+                renderRecentSessions();
+            }
+        }
+
+        function getLevelData(sppb) {
+            if(sppb <= 3) return { label: 'Discapacidad / Fragilidad Severa (A)', color: 'text-red-600 bg-red-100 border-red-200', key: 'A' };
+            if(sppb <= 6) return { label: 'Fragilidad (B)', color: 'text-orange-600 bg-orange-100 border-orange-200', key: 'B' };
+            if(sppb <= 9) return { label: 'Pre-Fragilidad (C)', color: 'text-yellow-700 bg-yellow-100 border-yellow-300', key: 'C' };
+            return { label: 'Robusto (D)', color: 'text-green-700 bg-green-100 border-green-200', key: 'D' };
+        }
+
+        function renderVgiStatus() {
+            const container = document.getElementById('vgi-status-content');
+            if(!currentPatient.valuations || currentPatient.valuations.length === 0) {
+                container.innerHTML = `<div class="text-center text-slate-500 py-4"><p class="text-sm mb-3">No hay valoración registrada.</p><button onclick="openValuationModal()" class="bg-gurea-base text-white px-4 py-2 rounded-lg font-bold text-sm">Realizar Primera VGI</button></div>`;
+                return;
+            }
+
+            const lastVgi = currentPatient.valuations[currentPatient.valuations.length - 1];
+            const daysSince = Math.floor((Date.now() - new Date(lastVgi.date).getTime()) / (1000 * 3600 * 24));
+            let dateAlert = daysSince > 30 ? `<span class="text-red-500 font-bold ml-2 text-xs"><i class="fa-solid fa-triangle-exclamation"></i> Hace ${daysSince} días</span>` : `<span class="text-slate-400 text-xs ml-2">Hace ${daysSince} días</span>`;
+            
+            const level = getLevelData(lastVgi.sppbTotal);
+
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-4">
+                    <span class="px-3 py-1 rounded-lg border font-bold text-sm ${level.color}">${level.label}</span>
+                    ${dateAlert}
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-center border-t border-slate-100 pt-4">
+                    <div><p class="text-[10px] text-slate-400 font-bold uppercase">SPPB</p><p class="font-bold text-lg text-slate-800">${lastVgi.sppbTotal}</p></div>
+                    <div><p class="text-[10px] text-slate-400 font-bold uppercase">TUG</p><p class="font-bold text-lg text-slate-800">${lastVgi.tug || '-'}</p></div>
+                    <div><p class="text-[10px] text-slate-400 font-bold uppercase">Fuerza</p><p class="font-bold text-lg text-slate-800">${lastVgi.grip || '-'}</p></div>
+                    <div><p class="text-[10px] text-slate-400 font-bold uppercase">Nutri</p><p class="font-bold text-[10px] text-slate-800 mt-1 truncate">${lastVgi.nutri || '-'}</p></div>
+                </div>
+            `;
+        }
+
+        // CONTROL EXCLUSIVO DE ACORDEONES VGI
+        window.toggleVgiSection = function(sectionId) {
+            const sections = ['minibest-container', 'sarcf-container', 'mna-container'];
+            sections.forEach(id => {
+                if (id !== sectionId) document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(sectionId).classList.toggle('hidden');
+            document.getElementById('vgi-modal-scroll').scrollTop = 0;
+        }
+
+        // CALCULADORAS VGI
+        function calcSppb() {
+            let eq = parseInt(document.getElementById('vgi-sppb-eq').value) || 0;
+            let ma = parseInt(document.getElementById('vgi-sppb-ma').value) || 0;
+            let si = parseInt(document.getElementById('vgi-sppb-si').value) || 0;
+            let total = eq + ma + si;
+            const tEl = document.getElementById('vgi-sppb-total');
+            tEl.textContent = total;
+            tEl.className = `text-lg font-bold ${total<=6?'text-red-500':(total<=9?'text-orange-500':'text-green-500')}`;
+        }
+
+        function calcMiniBest() {
+            let sum = 0;
+            for(let i=0; i<14; i++) { sum += parseInt(document.getElementById(`mb-${i}`).value) || 0; }
+            const el = document.getElementById('vgi-minibest-total');
+            el.textContent = sum;
+            el.className = `text-lg font-bold ${sum < 16 ? 'text-red-500' : 'text-green-500'}`;
+        }
+
+        function calcSarcf() {
+            let sum = 0;
+            for(let i=1; i<=5; i++) { sum += parseInt(document.getElementById(`sarcf-${i}`).value) || 0; }
+            const el = document.getElementById('vgi-sarcf-total');
+            el.textContent = sum;
+            el.className = `text-lg font-bold ${sum >= 4 ? 'text-red-500' : 'text-green-500'}`;
+        }
+
+        function calcMna() {
+            let sum = 0;
+            for(let i=1; i<=6; i++) { sum += parseInt(document.getElementById(`mna-${i}`).value) || 0; }
+            const elTotal = document.getElementById('vgi-mna-total');
+            const elLabel = document.getElementById('vgi-nutri-label');
+            elTotal.textContent = sum;
+            
+            if (sum >= 12) {
+                elTotal.className = 'text-sm font-bold text-green-600';
+                elLabel.textContent = 'Normal';
+                elLabel.className = 'text-sm font-bold text-green-600';
+            } else if (sum >= 8) {
+                elTotal.className = 'text-sm font-bold text-orange-500';
+                elLabel.textContent = 'Riesgo Malnutrición';
+                elLabel.className = 'text-sm font-bold text-orange-500';
+            } else {
+                elTotal.className = 'text-sm font-bold text-red-500';
+                elLabel.textContent = 'Desnutrición';
+                elLabel.className = 'text-sm font-bold text-red-500';
+            }
+        }
+
+        function openValuationModal() {
+            document.getElementById('vgi-modal').classList.remove('hidden');
+            
+            // Cerrar acordeones por defecto
+            ['minibest-container', 'sarcf-container', 'mna-container'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+
+            document.getElementById('vgi-sppb-eq').value = 0;
+            document.getElementById('vgi-sppb-ma').value = 0;
+            document.getElementById('vgi-sppb-si').value = 0;
+            for(let i=0; i<14; i++) document.getElementById(`mb-${i}`).value = 0;
+            for(let i=1; i<=5; i++) document.getElementById(`sarcf-${i}`).value = 0;
+            document.getElementById('mna-1').value = 2;
+            document.getElementById('mna-2').value = 3;
+            document.getElementById('mna-3').value = 2;
+            document.getElementById('mna-4').value = 2;
+            document.getElementById('mna-5').value = 2;
+            document.getElementById('mna-6').value = 3;
+            document.getElementById('vgi-tug').value = '';
+            document.getElementById('vgi-grip').value = '';
+            document.getElementById('vgi-notas').value = '';
+
+            calcSppb();
+            calcMiniBest();
+            calcSarcf();
+            calcMna();
+        }
+
+        function closeValuationModal() { document.getElementById('vgi-modal').classList.add('hidden'); }
+
+        function saveValuation() {
+            const vgi = {
+                id: Date.now().toString(),
+                date: new Date().toISOString(),
+                sppbEq: parseInt(document.getElementById('vgi-sppb-eq').value)||0,
+                sppbMa: parseInt(document.getElementById('vgi-sppb-ma').value)||0,
+                sppbSi: parseInt(document.getElementById('vgi-sppb-si').value)||0,
+                sppbTotal: parseInt(document.getElementById('vgi-sppb-total').textContent),
+                minibest: parseInt(document.getElementById('vgi-minibest-total').textContent),
+                tug: parseFloat(document.getElementById('vgi-tug').value)||null,
+                grip: parseFloat(document.getElementById('vgi-grip').value)||null,
+                sarcf: parseInt(document.getElementById('vgi-sarcf-total').textContent),
+                mna: parseInt(document.getElementById('vgi-mna-total').textContent),
+                nutri: document.getElementById('vgi-nutri-label').textContent,
+                notes: document.getElementById('vgi-notas').value
+            };
+            currentPatient.valuations.push(vgi);
+            savePatients();
+            closeValuationModal();
+            updateConsoleView();
+        }
+
+        function renderRecentSessions() {
+            const list = document.getElementById('setup-recent-sessions-list');
+            list.innerHTML = '';
+            if(!currentPatient.sessions || currentPatient.sessions.length === 0) return;
+            
+            const sorted = [...currentPatient.sessions].sort((a,b) => b.id - a.id).slice(0, 2);
+            sorted.forEach((sess, i) => {
+                list.innerHTML += `
+                    <button onclick="copySession('${sess.id}')" class="w-full bg-white border border-slate-200 hover:border-gurea-base p-4 rounded-xl flex justify-between items-center text-left shadow-sm">
+                        <div>
+                            <p class="text-[10px] text-slate-400 font-bold uppercase">${i===0?'Última Sesión':'Anterior'}</p>
+                            <p class="text-slate-800 font-bold text-sm">${new Date(sess.date).toLocaleDateString('es-ES')}</p>
+                        </div>
+                        <div class="text-slate-400"><i class="fa-solid fa-copy"></i></div>
+                    </button>
+                `;
+            });
+        }
+
+        window.toggleDT = function(exIdx, setIdx) {
+            currentWorkout[exIdx].sets[setIdx].dt = !currentWorkout[exIdx].sets[setIdx].dt;
+            renderActiveWorkout();
+        }
+
+        function startNewSession() {
+            currentWorkout = [];
+            launchActiveSession();
+        }
+
+        function copySession(id) {
+            const sess = currentPatient.sessions.find(s => s.id === id);
+            if(!sess) return;
+            currentWorkout = JSON.parse(JSON.stringify(sess.exercises));
+            launchActiveSession();
+        }
+
+        function generarRutinaInteligente() {
+            if(!currentPatient.valuations || currentPatient.valuations.length === 0) {
+                alert("Realiza una VGI primero para autogenerar la rutina.");
+                return;
+            }
+            const lastVgi = currentPatient.valuations[currentPatient.valuations.length - 1];
+            const level = getLevelData(lastVgi.sppbTotal).key;
+            
+            let template = CUSTOM_TEMPLATES[level];
+            
+            currentWorkout = template.map(ex => ({
+                name: ex.name,
+                domain: ex.domain,
+                sets: Array(ex.s).fill().map(() => ({ weight: ex.w, reps: ex.r, rpe: 6, resType: ex.res, durType: ex.dur || 'reps', dt: false }))
+            }));
+            launchActiveSession();
+        }
+
+        function launchActiveSession() {
+            document.getElementById('console-setup').classList.add('hidden');
+            document.getElementById('console-active').classList.remove('hidden');
+            document.getElementById('session-notes').value = '';
+            
+            let vgiStr = "Sin VGI";
+            if(currentPatient.valuations.length > 0) {
+                const lvl = getLevelData(currentPatient.valuations[currentPatient.valuations.length-1].sppbTotal);
+                vgiStr = lvl.label;
+            }
+            document.getElementById('active-vgi-indicator').textContent = vgiStr;
+            renderActiveWorkout();
+        }
+
+        window.toggleResType = function(exIdx, setIdx) {
+            const types = ['kg', '🟡', '🔴', '⚫', '🟣', '🟢'];
+            let current = currentWorkout[exIdx].sets[setIdx].resType || 'kg';
+            let nextIdx = (types.indexOf(current) + 1) % types.length;
+            currentWorkout[exIdx].sets[setIdx].resType = types[nextIdx];
+            renderActiveWorkout();
+        }
+        window.toggleDurType = function(exIdx, setIdx) {
+            let current = currentWorkout[exIdx].sets[setIdx].durType || 'reps';
+            currentWorkout[exIdx].sets[setIdx].durType = current === 'reps' ? 'sec' : 'reps';
+            renderActiveWorkout();
+        }
+        window.setManualValue = function(exIdx, setIdx, field, value) {
+            let val = parseFloat(value) || 0;
+            currentWorkout[exIdx].sets[setIdx][field] = val;
+            renderActiveWorkout();
+        }
+        window.changeRpe = function(exIdx, setIdx, delta) {
+            let rpe = currentWorkout[exIdx].sets[setIdx].rpe || 5;
+            rpe += delta;
+            if(rpe < 0) rpe = 0; if(rpe > 10) rpe = 10;
+            currentWorkout[exIdx].sets[setIdx].rpe = rpe;
+            renderActiveWorkout();
+        }
+
+        function renderActiveWorkout() {
+            const container = document.getElementById('active-exercises-list');
+            container.innerHTML = '';
+            
+            currentWorkout.forEach((ex, exIndex) => {
+                let setsHtml = '';
+                ex.sets.forEach((set, setIndex) => {
+                    let isDt = set.dt || false;
+                    let dtClass = isDt ? 'dt-active' : 'bg-slate-100 text-slate-400 border-slate-200';
+                    let dtText = isDt ? 'DT ON' : 'DT OFF';
+
+                    setsHtml += `
+                        <div class="flex items-center gap-1.5 bg-white p-2 rounded-lg mb-2 border border-slate-200 shadow-sm relative">
+                            <span class="text-[10px] text-slate-400 font-bold uppercase w-6 text-center">S${setIndex + 1}</span>
+                            
+                            <div class="flex-1 bg-slate-50 rounded flex items-center p-1 border border-slate-200">
+                                <button onclick="toggleResType(${exIndex}, ${setIndex})" class="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold text-slate-500 shadow-sm shrink-0 mr-1">${set.resType === 'kg' ? 'kg' : set.resType}</button>
+                                <input type="number" inputmode="decimal" step="0.5" class="w-full bg-transparent text-center font-bold text-slate-800 text-sm focus:outline-none" value="${set.weight}" onchange="setManualValue(${exIndex}, ${setIndex}, 'weight', this.value)">
+                            </div>
+                            
+                            <div class="flex-1 bg-slate-50 rounded flex items-center p-1 border border-slate-200">
+                                <button onclick="toggleDurType(${exIndex}, ${setIndex})" class="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold text-slate-500 shadow-sm shrink-0 mr-1">${set.durType === 'sec' ? 'S' : 'R'}</button>
+                                <input type="number" inputmode="numeric" class="w-full bg-transparent text-center font-bold text-slate-800 text-sm focus:outline-none" value="${set.reps}" onchange="setManualValue(${exIndex}, ${setIndex}, 'reps', this.value)">
+                            </div>
+
+                            <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded p-1">
+                                <button onclick="changeRpe(${exIndex}, ${setIndex}, -1)" class="w-5 text-slate-400 font-bold">-</button>
+                                <span class="w-4 text-center font-bold text-xs ${set.rpe>=8?'text-red-500':(set.rpe>=5?'text-orange-500':'text-green-500')}">${set.rpe}</span>
+                                <button onclick="changeRpe(${exIndex}, ${setIndex}, 1)" class="w-5 text-slate-400 font-bold">+</button>
+                            </div>
+
+                            <button onclick="toggleDT(${exIndex}, ${setIndex})" class="w-12 text-[9px] font-bold border rounded py-1.5 transition-colors ${dtClass}">${dtText}</button>
+                            
+                            <button onclick="removeSet(${exIndex}, ${setIndex})" class="w-6 text-center text-slate-300 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    `;
+                });
+
+                let domainColors = { "Fuerza":"bg-blue-100 text-blue-700", "Equilibrio/Marcha":"bg-purple-100 text-purple-700", "Aeróbico":"bg-rose-100 text-rose-700", "Flexibilidad":"bg-teal-100 text-teal-700" };
+                let dColor = domainColors[ex.domain] || "bg-slate-100 text-slate-600";
+
+                container.innerHTML += `
+                    <div class="bg-slate-50 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-3 bg-white border-b border-slate-200 flex justify-between items-center">
+                            <div>
+                                <h3 class="font-bold text-slate-800 text-sm">${ex.name}</h3>
+                                <span class="text-[9px] px-2 py-0.5 rounded font-bold uppercase ${dColor}">${ex.domain}</span>
+                            </div>
+                            <button onclick="removeExercise(${exIndex})" class="text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash text-sm"></i></button>
+                        </div>
+                        <div class="p-2">${setsHtml}</div>
+                        <div class="px-2 pb-2">
+                            <button onclick="addSet(${exIndex})" class="w-full py-2 bg-white text-slate-500 rounded-lg text-xs font-bold border border-slate-200 hover:bg-slate-50 shadow-sm">+ Añadir Serie</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function addSet(exIdx) {
+            let last = currentWorkout[exIdx].sets[currentWorkout[exIdx].sets.length - 1];
+            currentWorkout[exIdx].sets.push(last ? {...last} : { weight: 0, reps: 10, rpe: 6, resType: 'kg', durType: 'reps', dt: false });
+            renderActiveWorkout();
+        }
+        function removeSet(exIdx, setIdx) {
+            currentWorkout[exIdx].sets.splice(setIdx, 1);
+            if(currentWorkout[exIdx].sets.length === 0) currentWorkout.splice(exIdx, 1);
+            renderActiveWorkout();
+        }
+        function removeExercise(exIdx) { currentWorkout.splice(exIdx, 1); renderActiveWorkout(); }
+
+        function finishSession() {
+            if(currentWorkout.length === 0) { alert("Añade ejercicios."); return; }
+            currentPatient.sessions.push({
+                id: Date.now().toString(),
+                date: new Date().toISOString(),
+                notes: document.getElementById('session-notes').value.trim(),
+                exercises: JSON.parse(JSON.stringify(currentWorkout))
+            });
+            savePatients();
+            currentWorkout = [];
+            switchTab('charts');
+        }
+
+        function openExerciseModal() { document.getElementById('exercise-modal').classList.remove('hidden'); renderPatternTabs(); renderModalExercises(); }
+        function closeExerciseModal() { document.getElementById('exercise-modal').classList.add('hidden'); }
+        function renderPatternTabs() {
+            const container = document.getElementById('pattern-tabs');
+            container.innerHTML = '';
+            DOMINIOS.forEach(p => {
+                const active = p === activeDomainTab ? 'bg-gurea-base text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200';
+                container.innerHTML += `<button onclick="activeDomainTab='${p}'; renderModalExercises(); renderPatternTabs()" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${active}">${p}</button>`;
+            });
+        }
+        function renderModalExercises() {
+            const container = document.getElementById('modal-exercise-list');
+            container.innerHTML = '';
+            EXERCISE_DB.filter(e => e.domain === activeDomainTab).forEach(ex => {
+                container.innerHTML += `
+                    <button onclick="addExerciseToWorkout('${ex.name}', '${ex.domain}')" class="w-full text-left p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 flex justify-between items-center hover:border-gurea-base shadow-sm">
+                        <span class="font-bold text-sm">${ex.name}</span>
+                        <div class="w-6 h-6 rounded-full bg-white border border-slate-200 text-gurea-base flex items-center justify-center"><i class="fa-solid fa-plus text-xs"></i></div>
+                    </button>
+                `;
+            });
+        }
+        window.addExerciseToWorkout = function(name, domain) {
+            currentWorkout.push({ name: name, domain: domain, sets: [{ weight: 0, reps: 10, rpe: 6, resType: 'kg', durType: 'reps', dt: false }] });
+            closeExerciseModal();
+            renderActiveWorkout();
+        }
+
+        function openTemplatesModal() {
+            document.getElementById('templates-modal').classList.remove('hidden');
+            editTemplate('C');
+        }
+        function closeTemplatesModal() { document.getElementById('templates-modal').classList.add('hidden'); }
+        window.editTemplate = function(level) {
+            activeTemplateEdit = level;
+            const btns = document.getElementById('template-level-tabs').children;
+            for(let b of btns) b.classList.remove('ring-2', 'ring-offset-1', 'ring-slate-400');
+            event.currentTarget.classList.add('ring-2', 'ring-offset-1', 'ring-slate-400');
+            renderTemplateEditor();
+        }
+        function renderTemplateEditor() {
+            const container = document.getElementById('template-editor-content');
+            let html = `<p class="text-xs text-slate-500 mb-4">Ejercicios autogenerados para el nivel ${activeTemplateEdit}.</p>`;
+            CUSTOM_TEMPLATES[activeTemplateEdit].forEach((ex, i) => {
+                html += `
+                    <div class="bg-white p-3 rounded-xl border border-slate-200 mb-2 shadow-sm">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="font-bold text-sm text-slate-800">${ex.name}</span>
+                            <button onclick="removeTemplateEx(${i})" class="text-red-400"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <div class="flex gap-2 text-xs">
+                            <div class="flex-1"><label class="text-slate-500 block">Series</label><input type="number" value="${ex.s}" onchange="updateTpl(${i},'s',this.value)" class="w-full border rounded p-1 text-center bg-slate-50"></div>
+                            <div class="flex-1"><label class="text-slate-500 block">Reps/s</label><input type="number" value="${ex.r}" onchange="updateTpl(${i},'r',this.value)" class="w-full border rounded p-1 text-center bg-slate-50"></div>
+                            <div class="flex-1"><label class="text-slate-500 block">Carga</label><input type="number" value="${ex.w}" onchange="updateTpl(${i},'w',this.value)" class="w-full border rounded p-1 text-center bg-slate-50"></div>
+                            <div class="flex-1"><label class="text-slate-500 block">Tipo R.</label>
+                                <select onchange="updateTpl(${i},'res',this.value)" class="w-full border rounded p-1 bg-slate-50">
+                                    <option value="kg" ${ex.res==='kg'?'selected':''}>kg</option><option value="🔴" ${ex.res==='🔴'?'selected':''}>🔴</option><option value="🟢" ${ex.res==='🟢'?'selected':''}>🟢</option><option value="🟡" ${ex.res==='🟡'?'selected':''}>🟡</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+        window.updateTpl = function(idx, field, val) {
+            CUSTOM_TEMPLATES[activeTemplateEdit][idx][field] = field==='res'||field==='dur'?val:parseFloat(val);
+            saveTemplates();
+        }
+        window.removeTemplateEx = function(idx) {
+            CUSTOM_TEMPLATES[activeTemplateEdit].splice(idx,1);
+            saveTemplates(); renderTemplateEditor();
+        }
+
+        function prepChartsTab() {
+            const select = document.getElementById('history-patient-select');
+            select.innerHTML = '<option value="">Selecciona un paciente...</option>';
+            patients.forEach(p => { select.innerHTML += `<option value="${p.id}" ${currentPatient && currentPatient.id === p.id ? 'selected' : ''}>${p.name}</option>`; });
+            renderCharts();
+        }
+        window.selectPatientFromHistory = function() {
+            const id = document.getElementById('history-patient-select').value;
+            if(id) { currentPatient = patients.find(p => p.id === id); document.getElementById('current-patient-badge').textContent = currentPatient.name; renderCharts(); }
+        }
+
+        function renderCharts() {
+            if(!currentPatient) {
+                document.getElementById('charts-no-patient').classList.remove('hidden');
+                document.getElementById('charts-container').classList.add('hidden');
+                return;
+            }
+            document.getElementById('charts-no-patient').classList.add('hidden');
+            document.getElementById('charts-container').classList.remove('hidden');
+
+            const vals = [...currentPatient.valuations].sort((a,b) => a.id - b.id);
+            const sess = [...currentPatient.sessions].sort((a,b) => a.id - b.id);
+
+            if(vals.length === 0 && sess.length === 0) {
+                document.getElementById('charts-empty-state').classList.remove('hidden');
+                document.getElementById('charts-data-content').classList.add('hidden');
+                return;
+            } else {
+                document.getElementById('charts-empty-state').classList.add('hidden');
+                document.getElementById('charts-data-content').classList.remove('hidden');
+            }
+
+            renderHeatmap(vals, sess);
+
+            const vgiLabels = vals.map(v => new Date(v.date).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }));
+            
+            if(charts.sppb) charts.sppb.destroy();
+            charts.sppb = new Chart(document.getElementById('sppbChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: vgiLabels, datasets: [{ label: 'SPPB', data: vals.map(v=>v.sppbTotal), borderColor: '#4EAFD8', backgroundColor: 'rgba(78, 175, 216, 0.1)', borderWidth: 3, tension: 0.3, fill: true, pointRadius: 5 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 12, ticks: { stepSize: 3 } } }, plugins: { legend: { display: false } } }
+            });
+
+            if(charts.minibest) charts.minibest.destroy();
+            charts.minibest = new Chart(document.getElementById('minibestChart').getContext('2d'), {
+                type: 'line',
+                data: { labels: vgiLabels, datasets: [{ label: 'Mini-BESTest', data: vals.map(v=>v.minibest||0), borderColor: '#8b5cf6', backgroundColor: 'rgba(139, 92, 246, 0.1)', borderWidth: 3, tension: 0.3, fill: true, pointRadius: 5 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 28, ticks: { stepSize: 7 } } }, plugins: { legend: { display: false } } }
+            });
+
+            if(charts.sarcf) charts.sarcf.destroy();
+            charts.sarcf = new Chart(document.getElementById('sarcfChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels: vgiLabels, datasets: [{ label: 'SARC-F', data: vals.map(v=>v.sarcf||0), backgroundColor: '#ef4444', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 10 } }, plugins: { legend: { display: false } } }
+            });
+
+            if(charts.mna) charts.mna.destroy();
+            charts.mna = new Chart(document.getElementById('mnaChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels: vgiLabels, datasets: [{ label: 'MNA-SF', data: vals.map(v=>v.mna||0), backgroundColor: '#3b82f6', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 14 } }, plugins: { legend: { display: false } } }
+            });
+
+            if(charts.tug) charts.tug.destroy();
+            charts.tug = new Chart(document.getElementById('tugChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels: vgiLabels, datasets: [{ label: 'TUG', data: vals.map(v=>v.tug||0), backgroundColor: '#f59e0b', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            if(charts.grip) charts.grip.destroy();
+            charts.grip = new Chart(document.getElementById('gripChart').getContext('2d'), {
+                type: 'bar',
+                data: { labels: vgiLabels, datasets: [{ label: 'Fuerza', data: vals.map(v=>v.grip||0), backgroundColor: '#10b981', borderRadius: 4 }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            const domTotals = { "Fuerza": 0, "Equilibrio/Marcha": 0, "Aeróbico": 0, "Flexibilidad": 0 };
+            sess.forEach(s => {
+                s.exercises.forEach(ex => {
+                    let vol = ex.sets.reduce((sum, set) => sum + (parseInt(set.reps) || 0), 0);
+                    if(domTotals[ex.domain] !== undefined) domTotals[ex.domain] += vol;
+                });
+            });
+
+            if(charts.radar) charts.radar.destroy();
+            charts.radar = new Chart(document.getElementById('radarChart').getContext('2d'), {
+                type: 'radar',
+                data: {
+                    labels: Object.keys(domTotals),
+                    datasets: [{ label: 'Volumen', data: Object.values(domTotals), backgroundColor: 'rgba(78, 175, 216, 0.2)', borderColor: '#4EAFD8', pointBackgroundColor: '#fff', borderWidth: 2 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { r: { ticks: { display: false } } }, plugins: { legend: { display: false } } }
+            });
+
+            renderHistory(sess, vals);
+        }
+
+        function renderHeatmap(vals, sess) {
+            const container = document.getElementById('heatmap-container');
+            container.innerHTML = '';
+            
+            const today = new Date();
+            const days = 90; 
+            
+            let html = '';
+            let sessionsIn90Days = 0;
+
+            for(let i = days - 1; i >= 0; i--) {
+                let d = new Date(today.getTime() - (i * 24 * 60 * 60 * 1000));
+                let dateStr = d.toISOString().split('T')[0];
+                
+                let hasVal = vals.some(v => v.date.startsWith(dateStr));
+                let hasSes = sess.some(s => s.date.startsWith(dateStr));
+                
+                if (hasSes) sessionsIn90Days++;
+
+                let boxClass = 'heat-none';
+                if(hasVal && hasSes) boxClass = 'heat-both';
+                else if(hasVal) boxClass = 'heat-val';
+                else if(hasSes) boxClass = 'heat-ses';
+                
+                html += `<div class="heat-box ${boxClass}" title="${d.toLocaleDateString('es-ES')}"></div>`;
+            }
+            container.innerHTML = html;
+
+            // KPI Media Semanal (90 días = 12.8 semanas)
+            weeklyAvgValue = (sessionsIn90Days / 12.8).toFixed(1);
+            document.getElementById('adherence-kpi').textContent = `${weeklyAvgValue} / sem`;
+        }
+
+        function renderHistory(sess, vals) {
+            const notesContainer = document.getElementById('history-notes-list');
+            notesContainer.innerHTML = '';
+            
+            if(vals.length === 0) {
+                notesContainer.innerHTML = '<p class="text-slate-400 italic text-sm">Sin notas clínicas de VGI.</p>';
+            } else {
+                let reversedVals = [...vals].reverse();
+                reversedVals.forEach((v, index) => {
+                    let deltaStr = '';
+                    if (index + 1 < reversedVals.length) {
+                        let prev = reversedVals[index + 1];
+                        if (v.sppbTotal === prev.sppbTotal) {
+                            let changes = [];
+                            if(v.sppbEq > prev.sppbEq) changes.push('Eq 🔼');
+                            if(v.sppbEq < prev.sppbEq) changes.push('Eq 🔽');
+                            if(v.sppbMa > prev.sppbMa) changes.push('Ma 🔼');
+                            if(v.sppbMa < prev.sppbMa) changes.push('Ma 🔽');
+                            if(v.sppbSi > prev.sppbSi) changes.push('Si 🔼');
+                            if(v.sppbSi < prev.sppbSi) changes.push('Si 🔽');
+                            if (changes.length > 0) deltaStr = `<span class="text-[10px] text-blue-500 font-bold ml-2">Δ Interno: ${changes.join(', ')}</span>`;
+                        }
+                    }
+
+                    notesContainer.innerHTML += `
+                        <div class="bg-slate-50 border-l-4 border-purple-400 p-3 rounded-r-xl text-sm shadow-sm">
+                            <div class="flex justify-between items-center mb-1">
+                                <div class="flex items-center">
+                                    <span class="text-slate-400 font-bold text-[10px]">${new Date(v.date).toLocaleDateString('es-ES')}</span>
+                                    ${deltaStr}
+                                </div>
+                                <span class="text-[9px] font-bold px-2 py-0.5 rounded uppercase bg-purple-100 text-purple-700">VGI</span>
+                            </div>
+                            <span class="text-slate-700">${v.notes || 'Sin observaciones.'}</span>
+                        </div>`;
+                });
+            }
+
+            const accContainer = document.getElementById('history-accordion');
+            accContainer.innerHTML = '';
+            [...sess].reverse().forEach(s => {
+                let exHtml = s.exercises.map(ex => {
+                    let setsStr = ex.sets.map(set => {
+                        let dtBadge = set.dt ? `<span class="bg-yellow-200 text-yellow-800 px-1 rounded ml-1">DT</span>` : '';
+                        return `<span class="bg-white border border-slate-200 px-2 py-1 rounded text-xs mr-1 mb-1 inline-block shadow-sm text-slate-600"><b>${set.reps}${set.durType==='sec'?'S':'R'} ${set.weight>0?set.weight:''}${set.resType}</b> (R${set.rpe}) ${dtBadge}</span>`;
+                    }).join('');
+                    return `<div class="mb-2"><div class="font-bold text-slate-700 text-xs mb-1">${ex.name}</div><div>${setsStr}</div></div>`;
+                }).join('');
+
+                accContainer.innerHTML += `
+                    <div class="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div onclick="document.getElementById('sess-${s.id}').classList.toggle('hidden')" class="p-3 flex justify-between items-center cursor-pointer hover:bg-slate-100">
+                            <p class="font-bold text-slate-800 capitalize text-sm">${new Date(s.date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                            <i class="fa-solid fa-chevron-down text-slate-400"></i>
+                        </div>
+                        <div id="sess-${s.id}" class="hidden p-3 border-t border-slate-200 bg-white">${exHtml}</div>
+                    </div>
+                `;
+            });
+        }
+
+        // GENERACIÓN DE PDF
+        function openPdfConfigModal() { document.getElementById('pdf-config-modal').classList.remove('hidden'); }
+
+        window.executePDF = function() {
+            if(!currentPatient) return;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const incVgi = document.getElementById('pdf-inc-vgi').checked;
+            const incSes = document.getElementById('pdf-inc-ses').checked;
+            
+            // Header
+            if (logoBase64) {
+                doc.addImage(logoBase64, 'PNG', 14, 10, 40, 12);
+            }
+            doc.setFontSize(16);
+            doc.setTextColor(78, 175, 216);
+            doc.text("INFORME DE EVOLUCIÓN CLÍNICA", 196, 18, { align: "right" });
+            
+            doc.setFontSize(10);
+            doc.setTextColor(100, 116, 139);
+            doc.text(`Paciente: ${currentPatient.name}`, 14, 32);
+            doc.text(`Fecha de expedición: ${new Date().toLocaleDateString('es-ES')}`, 14, 37);
+            doc.text(`Centro: Recuperación Funcional Gurea`, 14, 42);
+
+            let startY = 55;
+
+            // Integrar métricas de adherencia
+            doc.setFontSize(10);
+            doc.setTextColor(30, 41, 59);
+            doc.text(`Adherencia al Tratamiento (Últimos 90 días): ${weeklyAvgValue} sesiones/semana.`, 14, startY);
+            startY += 8;
+
+            // Dibujar Heatmap PDF (simplificado)
+            const days = 90;
+            const today = new Date();
+            let hX = 14;
+            let hY = startY;
+            const boxSize = 3;
+            const gap = 1;
+            const vals = currentPatient.valuations;
+            const sess = currentPatient.sessions;
+
+            for(let i = days - 1; i >= 0; i--) {
+                let d = new Date(today.getTime() - (i * 24 * 60 * 60 * 1000));
+                let dateStr = d.toISOString().split('T')[0];
+                
+                let hasVal = vals.some(v => v.date.startsWith(dateStr));
+                let hasSes = sess.some(s => s.date.startsWith(dateStr));
+
+                if(hasVal && hasSes) doc.setFillColor(236, 72, 153);
+                else if(hasVal) doc.setFillColor(168, 85, 247);
+                else if(hasSes) doc.setFillColor(78, 175, 216);
+                else doc.setFillColor(241, 245, 249);
+
+                doc.rect(hX, hY, boxSize, boxSize, 'F');
+                hX += boxSize + gap;
+                if(hX > 190) { hX = 14; hY += boxSize + gap; }
+            }
+            startY = hY + 12;
+
+            if (incVgi && currentPatient.valuations.length > 0) {
+                doc.setFontSize(12);
+                doc.setTextColor(30, 41, 59);
+                doc.text("Historial de Valoraciones Geriátricas Integrales (VGI)", 14, startY);
+                
+                let headRow = ['Fecha'];
+                let dataKeys = ['date'];
+                
+                if(document.getElementById('pdf-v-sppb').checked) { headRow.push('SPPB'); dataKeys.push('sppbTotal'); }
+                if(document.getElementById('pdf-v-mb').checked) { headRow.push('M-BEST'); dataKeys.push('minibest'); }
+                if(document.getElementById('pdf-v-sarcf').checked) { headRow.push('SARC-F'); dataKeys.push('sarcf'); }
+                if(document.getElementById('pdf-v-mna').checked) { headRow.push('MNA'); dataKeys.push('mna'); }
+                if(document.getElementById('pdf-v-tug').checked) { headRow.push('TUG'); dataKeys.push('tug'); }
+                if(document.getElementById('pdf-v-grip').checked) { headRow.push('Fuerza'); dataKeys.push('grip'); }
+                headRow.push('Notas');
+                dataKeys.push('notes');
+
+                const vgiBody = currentPatient.valuations.map(v => {
+                    return dataKeys.map(key => {
+                        if(key === 'date') return new Date(v[key]).toLocaleDateString('es-ES');
+                        if(key === 'sppbTotal') return `${v[key] || 0}/12`;
+                        if(key === 'minibest') return `${v[key] || 0}/28`;
+                        if(key === 'sarcf') return `${v[key] || 0}/10`;
+                        if(key === 'mna') return `${v[key] || 0}/14`;
+                        if(key === 'tug') return v[key] ? `${v[key]} s` : '-';
+                        if(key === 'grip') return v[key] ? `${v[key]} kg` : '-';
+                        if(key === 'notes') return v[key] || '-';
+                        return v[key];
+                    });
+                });
+
+                doc.autoTable({
+                    startY: startY + 5,
+                    head: [headRow],
+                    body: vgiBody,
+                    theme: 'grid',
+                    headStyles: { fillColor: [78, 175, 216] },
+                    styles: { fontSize: 8 },
+                    columnStyles: { [headRow.length - 1]: { cellWidth: 50 } } 
+                });
+                startY = doc.lastAutoTable.finalY + 15;
+            }
+
+            if (incSes && currentPatient.sessions.length > 0) {
+                doc.setFontSize(12);
+                doc.setTextColor(30, 41, 59);
+                doc.text("Registro de Sesiones de Entrenamiento", 14, startY);
+
+                const sessBody = currentPatient.sessions.map(s => {
+                    let volStr = s.exercises.map(ex => `${ex.name} (${ex.sets.length} series)`).join('\n');
+                    return [
+                        new Date(s.date).toLocaleDateString('es-ES'),
+                        volStr || '-'
+                    ];
+                });
+
+                doc.autoTable({
+                    startY: startY + 5,
+                    head: [['Fecha', 'Ejercicios (Volumen)']],
+                    body: sessBody,
+                    theme: 'grid',
+                    headStyles: { fillColor: [78, 175, 216] },
+                    styles: { fontSize: 8 }
+                });
+            }
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(8);
+                doc.setTextColor(150);
+                doc.text('Documento clínico confidencial generado por Gurea Clínico.', 14, 290);
+                doc.text(`Página ${i} de ${pageCount}`, 196, 290, { align: "right" });
+            }
+
+            doc.save(`Informe_Clinico_${currentPatient.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+            document.getElementById('pdf-config-modal').classList.add('hidden');
+        }
+
+        renderPatientsList();
+    </script>
+</body>
+</html>
